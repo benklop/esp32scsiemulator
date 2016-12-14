@@ -1,6 +1,9 @@
 ### Tiny SCSI Emulator ###
 
 * Teensy based (Parallel) SCSI Device Emulator and "PocketKnife"
+* Project Hub [https://hackaday.io/project/18974-tiny-scsi-emulator]
+* Schematics [https://bitbucket.org/tinyscsi/hardware]
+* Firmware [https://bitbucket.org/tinyscsi/tinyscsiemulator]
 
 ### Dependencies ###
 
