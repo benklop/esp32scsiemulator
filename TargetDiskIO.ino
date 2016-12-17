@@ -5,13 +5,14 @@
 static uint8_t TARGET_DISKBUF[64*1024];
 static uint8_t TARGET_VERIFYBUF[512];
 
-static uint8_t TARGET_INQUIRY_RESPONSE[96] = {
+static uint8_t TARGET_INQUIRY_RESPONSE[] = {
   0x00, 0x00, 0x01, 0x01,
   0x32, 0x00, 0x00, 0x00,
   // Vendor ID (8 Bytes)
-  'G','r','i','z','z','l','y',' ',
+  'T','i','n','y','S','C','S','I',
   // Product ID (16 Bytes)
-  'T','i','n','y','S','C','S','I','E','m','u','l','a','t','o','r',
+  'T','S','E','D','i','s','k',' ',
+  ' ',' ',' ',' ',' ',' ',' ',' ',
   // Revision Number (4 Bytes)
   '0','0','0','0',
   // Serial Number (8 Bytes)
@@ -36,14 +37,22 @@ int target_DiskInquiry() {
   // Setup sense response
   memcpy(TARGET_RESPBUF, TARGET_INQUIRY_RESPONSE, sizeof(TARGET_INQUIRY_RESPONSE));
   len = 5 + TARGET_RESPBUF[4];
-  if(target_lun >= luns) {
+  if(!lun[target_lun].Enabled) {
     TARGET_RESPBUF[0] = 0x7f;
   }
+
   if(lun[target_lun].Vendor[0]) {
     memcpy(TARGET_RESPBUF+8, lun[target_lun].Vendor, 8);
   }
   if(lun[target_lun].Model[0]) {
     memcpy(TARGET_RESPBUF+16, lun[target_lun].Model, 16);
+  } else {
+    if(lun[target_lun].Size > 1024*1024*4) {
+      snprintf((char *)(TARGET_RESPBUF+24), 8, "%5dGB", (int)(lun[target_lun].Size / (2 * 1024 * 1024)));
+    } else {
+      snprintf((char *)(TARGET_RESPBUF+24), 8, "%5dMB", (int)(lun[target_lun].Size / (2 * 1024)));
+    }
+    TARGET_RESPBUF[31] = ' ';
   }
   if(lun[target_lun].Revision[0]) {
     memcpy(TARGET_RESPBUF+32, lun[target_lun].Revision, 4);
@@ -400,5 +409,23 @@ int target_CommandGroup1WriteLong() {
 
   // Read Sectors
   return target_WriteSectors(sectorOffset, 1);
+}
+
+// Format Unit - Return Good Status
+int target_CommandFormat() {
+  DEBUGPRINT(DBG_TRACE, " > Format");
+  if(target_CheckMedium()) return 0;
+
+  /* Check for parameter list ('FMTDATA' Bit) */
+  if(target_cmdbuf[1] & 0x10) {
+    target_status = STATUS_CHECK;
+    target_sense[target_lun].key = ILLEGAL_REQUEST; // Illegal Request
+    target_sense[target_lun].code = INVALID_FIELD_IN_CDB; // Invalid field in CDB
+    target_sense[target_lun].key_specific[0] = ERROR_IN_OPCODE; // Error in Byte 1
+    target_sense[target_lun].key_specific[1] = 0x00;
+    target_sense[target_lun].key_specific[2] = 0x01;
+    return 0;
+  }
+  return 0;
 }
 

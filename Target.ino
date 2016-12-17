@@ -6,7 +6,7 @@
 #include "LUNS.h"
 
 //#define SUPPORT_UNIT_ATTENTION
-//#define SUPPORT_ETHERNET
+#define SUPPORT_ETHERNET
 
 #define PHASE_INVALID 0
 #define PHASE_SELECT 1
@@ -51,17 +51,14 @@ void print_cdb() {
 
 int target_GetMessageOut() {
   int rv;
-//  DEBUGPRINT(DBG_LOWLEVEL, " > Message OUT: ");
   PhaseDelay();
   ncr_WriteRegister(TARGET_COMMAND_REG, (TCR_ASSERT_MSG | TCR_ASSERT_CD));
   rv=ncr_GetPIO(&target_msg, 1, 1);
-//  DEBUGPRINT(DBG_LOWLEVEL, "%d", target_msg);
   return rv;
 }
 
 int target_PutMessageIn() {
   int rv;
-//  DEBUGPRINT(DBG_LOWLEVEL, " > Message IN: %d", target_msg);
   PhaseDelay();
   ncr_WriteRegister(TARGET_COMMAND_REG, (TCR_ASSERT_MSG | TCR_ASSERT_CD | TCR_ASSERT_IO));
   rv= ncr_PutPIO(&target_msg, 1, 1);
@@ -73,7 +70,7 @@ int target_GetCommand() {
   int len = -1;
   int rv = 0;
 
-//  DEBUGPRINT(DBG_LOWLEVEL, " > Command: [");
+//  DEBUGPRINT(DBG_TRACE, " > Command: [");
   PhaseDelay();
 
   ncr_WriteRegister(TARGET_COMMAND_REG, TCR_ASSERT_CD);
@@ -89,7 +86,7 @@ int target_GetCommand() {
     case 7: len = 0; break;
   }
 
-//  DEBUGPRINT(DBG_LOWLEVEL, " %02x", target_cmdbuf[0]);
+//  DEBUGPRINT(DBG_TRACE, " %02x", target_cmdbuf[0]);
 
   if(len >= 0) {
     if(len > 0)
@@ -128,26 +125,12 @@ int target_PutStatus() {
 
 // Data Out Phase initiator to target
 int target_DOUT(uint8_t *buf, uint16_t len, uint16_t count) {
-  int rv;
-//  DEBUGPRINT(DBG_LOWLEVEL, " > Data OUT %d %d", len, count);
   ncr_WriteRegister(TARGET_COMMAND_REG, 0);
-  rv = ncr_Get(buf, len, count);
-//  DEBUGPRINT(DBG_DATABUFS, " [");
-//  for(uint16_t ii=0; ii<=len*count; ii++) {
-//    DEBUGPRINT(DBG_DATABUFS, " %02x,", buf[ii]);
-//  }
-//  DEBUGPRINT(DBG_DATABUFS, " ]");
-  return rv;
+  return ncr_Get(buf, len, count);
 }
 
 // Data In Phase target to initiator
 int target_DIN(uint8_t *buf, uint16_t len, uint16_t count) {
-//  DEBUGPRINT(DBG_LOWLEVEL, " > Data IN %d %d", len, count);
-//  DEBUGPRINT(DBG_DATABUFS, " [");
-//  for(uint16_t ii=0; ii<=len*count; ii++) {
-//    DEBUGPRINT(DBG_DATABUFS, " %02x,", buf[ii]);
-//  }
-//  DEBUGPRINT(DBG_DATABUFS, " ]");
   ncr_WriteRegister(TARGET_COMMAND_REG, TCR_ASSERT_IO);
   return ncr_Put(buf, len, count);
 }
@@ -176,15 +159,15 @@ int target_MessageProcess() {
       if(target_GetMessageOut()) return 1;
       TARGET_EXTMSG[0] = MSG_LEN = target_msg;
       if(MSG_LEN == 0) MSG_LEN = 256;
-      DEBUGPRINT(DBG_TRACE, " %d", MSG_LEN);
+//      DEBUGPRINT(DBG_TRACE, " %d", MSG_LEN);
       if(target_GetMessageOut()) return 1;
       TARGET_EXTMSG[1] = MSG_CODE = target_msg;
-      DEBUGPRINT(DBG_TRACE, " %d", MSG_CODE);
+//      DEBUGPRINT(DBG_TRACE, " %d", MSG_CODE);
       MSG_PTR=2;
       while(MSG_PTR < MSG_LEN) {
         if(target_GetMessageOut()) return 1;
         TARGET_EXTMSG[MSG_PTR++] = target_msg;
-        DEBUGPRINT(DBG_TRACE, " %d", target_msg);
+//        DEBUGPRINT(DBG_TRACE, " %d", target_msg);
       }
       target_msg = 0x07;
       if(target_PutMessageIn()) return 1;
@@ -275,24 +258,6 @@ int target_CommandSense() {
 
   // Send it
   return target_DIN(TARGET_RESPBUF, len, 1);
-}
-
-// Format Unit - Return Good Status
-int target_CommandFormat() {
-  DEBUGPRINT(DBG_TRACE, " > Format");
-  if(target_CheckMedium()) return 0;
-
-  /* Check for parameter list ('FMTDATA' Bit) */
-  if(target_cmdbuf[1] & 0x10) {
-    target_status = STATUS_CHECK;
-    target_sense[target_lun].key = ILLEGAL_REQUEST; // Illegal Request
-    target_sense[target_lun].code = INVALID_FIELD_IN_CDB; // Invalid field in CDB
-    target_sense[target_lun].key_specific[0] = ERROR_IN_OPCODE; // Error in Byte 1
-    target_sense[target_lun].key_specific[1] = 0x00;
-    target_sense[target_lun].key_specific[2] = 0x01;
-    return 0;
-  }
-  return 0;
 }
 
 int target_CommandModeSense6() {
@@ -513,6 +478,7 @@ int target_CommandReportLuns() {
   TARGET_RESPBUF[5] = 0;
   TARGET_RESPBUF[6] = 0;
   TARGET_RESPBUF[7] = 0;
+
   TARGET_RESPBUF[8] = 0;
   TARGET_RESPBUF[9] = 0;
   TARGET_RESPBUF[10] = 0;
@@ -523,7 +489,7 @@ int target_CommandReportLuns() {
   TARGET_RESPBUF[15] = 0;
 
   // Send it
-  return target_DIN(TARGET_RESPBUF, 8, 1);
+  return target_DIN(TARGET_RESPBUF, 16, 1);
 }
 
 int target_ProcessCommand() {
@@ -553,6 +519,7 @@ int target_ProcessCommand() {
   switch(target_cmdbuf[0]) {
     case CMD_INQUIRY:
       switch(lun[target_lun].Type) {
+        default:
         case LUN_DISK:
           return target_DiskInquiry();
 #ifdef SUPPORT_OPTICAL
@@ -567,7 +534,8 @@ int target_ProcessCommand() {
       target_status = STATUS_CHECK;
       target_sense[target_lun].key = ILLEGAL_REQUEST;
       return 0;
-    case CMD_REPORT_LUNS:         return target_CommandReportLuns();
+    case CMD_REPORT_LUNS:
+      return target_CommandReportLuns();
   }
 
 #ifdef SUPPORT_UNIT_ATTENTION
@@ -652,37 +620,48 @@ int target_ProcessCommand() {
   if(lun[target_lun].Type == LUN_ETHERNET) {
     int rv = target_EthernetProcess();
     if(rv >= 0) return rv;
+    //goto unknownCommand;
   }
 #endif
 
-  switch(target_cmdbuf[0]) {
-    case CMD_TEST_UNIT_READY:     return target_CommandTestReady();
-    case CMD_REZERO_UNIT:         return target_CommandReZero();
-    case CMD_FORMAT_UNIT:         return target_CommandFormat();
-    case CMD_READ6:               return target_CommandRead();
-    case CMD_WRITE6:              return target_CommandWrite();
-    case CMD_MODE_SENSE6:         return target_CommandModeSense6();
-    case CMD_START_STOP_UNIT:     return target_CommandStartStop();
-    case CMD_SEND_DIAGNOSTIC:     return target_CommandSendDiag();
-    case CMD_READ_CAPACITY10:     return target_CommandCapacity();
-//  case CMD_READUPDATEDBLOCK10:  return target_CommandReadUpdatedBlock();
-    case CMD_READ10:              return target_CommandGroup1Read();
-    case CMD_WRITE10:             return target_CommandGroup1Write();
-    case CMD_WRITEANDVERIFY10:    return target_CommandGroup1Write();
-    case CMD_READLONG10:          return target_CommandGroup1ReadLong();
-    case CMD_WRITELONG10:         return target_CommandGroup1WriteLong();
-    case CMD_SYNCHRONIZE_CACHE10: return target_CommandGroup1SyncCache();
-    case CMD_VERIFY10:            return target_CommandGroup1Verify();
-    default: 
-      DEBUGPRINT(DBG_GENERAL, " >Unknown Command");
-      print_cdb();
-      target_status = STATUS_CHECK;
-      target_sense[target_lun].key = ILLEGAL_REQUEST; // Illegal Request
-      target_sense[target_lun].code = INVALID_FIELD_IN_CDB; // Invalid field in CDB
-      target_sense[target_lun].key_specific[0] = ERROR_IN_OPCODE; // Error in opcode
-      target_sense[target_lun].key_specific[1] = 0x00;
-      target_sense[target_lun].key_specific[2] = 0x00;
+  if(lun[target_lun].Type == LUN_DISK) {
+    switch(target_cmdbuf[0]) {
+      case CMD_TEST_UNIT_READY:     return target_CommandTestReady();
+      case CMD_REZERO_UNIT:         return target_CommandReZero();
+      case CMD_FORMAT_UNIT:         return target_CommandFormat();
+      case CMD_READ6:               return target_CommandRead();
+      case CMD_WRITE6:              return target_CommandWrite();
+      case CMD_MODE_SENSE6:         return target_CommandModeSense6();
+      case CMD_START_STOP_UNIT:     return target_CommandStartStop();
+      case CMD_SEND_DIAGNOSTIC:     return target_CommandSendDiag();
+      case CMD_READ_CAPACITY10:     return target_CommandCapacity();
+      case CMD_READ10:              return target_CommandGroup1Read();
+      case CMD_WRITE10:             return target_CommandGroup1Write();
+      case CMD_WRITEANDVERIFY10:    return target_CommandGroup1Write();
+      case CMD_READLONG10:          return target_CommandGroup1ReadLong();
+      case CMD_WRITELONG10:         return target_CommandGroup1WriteLong();
+      case CMD_SYNCHRONIZE_CACHE10: return target_CommandGroup1SyncCache();
+      case CMD_VERIFY10:            return target_CommandGroup1Verify();
+    }
   }
+
+#ifdef SUPPORT_OPTICAL
+  if(lun[target_lun].Type == LUN_OPTICAL) {
+    switch(target_cmdbuf[0]) {
+      case CMD_READUPDATEDBLOCK10:  return target_CommandReadUpdatedBlock();
+    }
+  }
+#endif
+
+unknownCommand:
+  DEBUGPRINT(DBG_GENERAL, " >Unknown Command");
+  print_cdb();
+  target_status = STATUS_CHECK;
+  target_sense[target_lun].key = ILLEGAL_REQUEST; // Illegal Request
+  target_sense[target_lun].code = INVALID_FIELD_IN_CDB; // Invalid field in CDB
+  target_sense[target_lun].key_specific[0] = ERROR_IN_OPCODE; // Error in opcode
+  target_sense[target_lun].key_specific[1] = 0x00;
+  target_sense[target_lun].key_specific[2] = 0x00;
 
   return 0;
 }

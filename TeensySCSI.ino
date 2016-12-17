@@ -3,6 +3,8 @@
 #include "sdhc.h"
 #include <SPI.h>  // Include SPI if you're using SPI
 #include <SFE_MicroOLED.h>  // Include the SFE_MicroOLED library
+#include <EtherRaw.h> // Include Raw Ethernet library
+#include <EtherRawSocket.h>
 #include "ff.h"
 #include "cmdDispatch.h"
 #include "ParseMBR.h"
@@ -19,14 +21,14 @@ extern SD_CARD_DESCRIPTOR sdCardDesc;
 //////////////////////////
 // MicroOLED Definition //
 //////////////////////////
-#define PIN_RESET 27 // Connect RST to pin 9 (SPI & I2C)
-#define PIN_DC    28  // Connect DC to pin 8 (SPI only)
-#define PIN_CS    31 // Connect CS to pin 10 (SPI only)
+#define OLED_RESET 27 // Connect RST to pin 9 (SPI & I2C)
+#define OLED_DC    28 // Connect DC to pin 8 (SPI only)
+#define OLED_CS    31 // Connect CS to pin 10 (SPI only)
 
 //////////////////////////////////
 // MicroOLED Object Declaration //
 //////////////////////////////////
-MicroOLED oled(PIN_RESET, PIN_DC, PIN_CS);  // SPI Example
+MicroOLED oled(OLED_RESET, OLED_DC, OLED_CS);  // SPI Example
 
 void screenInit() {
   oled.begin();     // Initialize the OLED
@@ -67,6 +69,9 @@ void setup() {
 
   // Initialize SCSI interface
   ncr_Init();
+
+  // Initialize Ethernet chip
+  etherInit();
 
   oled.clear(ALL);
   oled.setCursor(0, 0);
@@ -153,10 +158,10 @@ elapsedMillis refreshTimer;
 void loop() {
   delay(1);
 
-  if(refreshTimer > 300) {
-    refreshTimer = 0;
-    displayRefresh();
-  }
+//  if(refreshTimer > 300) {
+//    refreshTimer = 0;
+//    displayRefresh();
+//  }
 
   // If we have an exec command pending, copy it, clear it, run it.
   if(!execLoop()) {

@@ -20,6 +20,7 @@ void ParseMBR(int Table) {
     uint32_t pOffset = *(uint32_t*)&entry[8];
     uint32_t pSize = *(uint32_t*)&entry[12];
     uint8_t pType = entry[4];
+    uint8_t tLUN;
 
     pTable[Table].Part[part].Size = pSize;
     pTable[Table].Part[part].Type = pType;
@@ -45,22 +46,33 @@ void ParseMBR(int Table) {
         }
         break;
       case 0xf8: // Disk LUN
-        while((luns < MAXLUNS) && (!lun[luns].Enabled) && (lun[luns].Type |= LUN_DISK) ) luns++;
-        if(luns < MAXLUNS) {
-          lun[luns].Type = LUN_DISK;
-          lun[luns].Offset = pTable[Table].Offset + pOffset;
-          lun[luns].Size = pSize;
-          lun[luns].Mounted = 1;
+        // Find first unused disk LUN
+        for(tLUN = 0; tLUN < MAXLUNS; tLUN++) {
+           if (!lun[tLUN].Enabled) continue;
+           if (lun[tLUN].Type != LUN_DISK) continue;
+           if (lun[tLUN].Size != 0) continue;
+           break;
+        }
+        if(tLUN < MAXLUNS) {
+          lun[tLUN].Type = LUN_DISK;
+          lun[tLUN].Offset = pTable[Table].Offset + pOffset;
+          lun[tLUN].Size = pSize;
+          lun[tLUN].Mounted = 1;
           luns++;
         }
 #ifdef SUPPORT_OPTICAL
       case 0xf9: // Optical LUN
-        while((luns < MAXLUNS) && (!lun[luns].Enabled) && (lun[luns].Type |= LUN_OPTICAL) ) luns++;
-        if(luns < MAXLUNS) {
-          lun[luns].Type = LUN_OPTICAL;
-          lun[luns].Offset = pTable[Table].Offset + pOffset;
-          lun[luns].Size = pSize;
-          lun[luns].Mounted = 1;
+        for(tLUN = 0; tLUN < MAXLUNS; tLUN++) {
+           if (!lun[tLUN].Enabled) continue;
+           if (lun[tLUN].Type != LUN_OPTICAL) continue;
+           if (lun[tLUN].Size != 0) continue;
+           break;
+        }
+        if(tLUN < MAXLUNS) {
+          lun[tLUN].Type = LUN_OPTICAL;
+          lun[tLUN].Offset = pTable[Table].Offset + pOffset;
+          lun[tLUN].Size = pSize;
+          lun[tLUN].Mounted = 1;
           luns++;
         }
 #endif

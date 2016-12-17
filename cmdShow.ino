@@ -88,7 +88,17 @@ void show_luns(int argc, char **argv) {
     if(lun[ii].Enabled) {
       switch(lun[ii].Type) {
         case LUN_DISK:
-          DEBUGPRINT(DBG_GENERAL, "%d: %9d \t%9d \t%08x\r\n", ii, lun[ii].Offset, (lun[ii].Offset + lun[ii].Size), lun[ii].Size); 
+          DEBUGPRINT(DBG_GENERAL, "%d: %9d \t%9d \t%08x DISK\r\n", ii, lun[ii].Offset, (lun[ii].Offset + lun[ii].Size), lun[ii].Size); 
+          break;
+        case LUN_OPTICAL:
+          DEBUGPRINT(DBG_GENERAL, "%d: %9d \t%9d \t%08x CDROM\r\n", ii, lun[ii].Offset, (lun[ii].Offset + lun[ii].Size), lun[ii].Size); 
+          break;
+        case LUN_ETHERNET:
+          DEBUGPRINT(DBG_GENERAL, "%d: %9d \t%9d \t%08x ETHERNET\r\n", ii, lun[ii].Offset, (lun[ii].Offset + lun[ii].Size), lun[ii].Size); 
+          break;
+        case LUN_TAPE:
+          DEBUGPRINT(DBG_GENERAL, "%d: %9d \t%9d \t%08x TAPE\r\n", ii, lun[ii].Offset, (lun[ii].Offset + lun[ii].Size), lun[ii].Size); 
+          break;
       }
     }
   }
