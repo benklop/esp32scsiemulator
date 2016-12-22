@@ -1,12 +1,11 @@
-#include "SCSI_Messages.h"
-#include "SCSI_Commands.h"
-#include "SCSI_Sense.h"
+#include "config.h"
+#include "scsiMessages.h"
+#include "scsiCommands.h"
+#include "scsiSense.h"
 #include "DebugConsole.h"
-#include "NCR5380.h"
+#include "drvNCR5380.h"
 #include "LUNS.h"
-
-//#define SUPPORT_UNIT_ATTENTION
-#define SUPPORT_ETHERNET
+#include "svcTarget.h"
 
 #define PHASE_INVALID 0
 #define PHASE_SELECT 1
@@ -16,14 +15,7 @@ static uint8_t target_phase = PHASE_INVALID;
 int target_interrupt = 1;
 int target_initialized = 0;
 
-typedef struct SenseData_s {
-  uint8_t key;
-  uint8_t code;
-  uint8_t qualifier;
-  uint8_t info[4];
-  uint8_t key_specific[3];
-} SenseData_t;
-static SenseData_t target_sense[MAXLUNS];
+SenseData_t target_sense[MAXLUNS];
 
 uint8_t unit_attention = 0xff;
 static uint8_t unit_attention_queue[8];
@@ -520,15 +512,19 @@ int target_ProcessCommand() {
     case CMD_INQUIRY:
       switch(lun[target_lun].Type) {
         default:
-        case LUN_DISK:
+        case LUN_DISK_GENERIC:
           return target_DiskInquiry();
 #ifdef SUPPORT_OPTICAL
-        case LUN_OPTICAL:
+        case LUN_OPTICAL_GENERIC:
           return target_OpticalInquiry();
 #endif
 #ifdef SUPPORT_ETHERNET
-        case LUN_ETHERNET:
-          return target_EthernetInquiry();
+        case LUN_ETHERNET_CABLETRON:
+          return target_CabletronInquiry();
+#endif
+#ifdef SUPPORT_ETHERNET_SCSILINK
+        case LUN_ETHERNET_SCSILINK:
+          return target_SCSILinkInquiry();
 #endif
       }
       target_status = STATUS_CHECK;
@@ -616,15 +612,23 @@ int target_ProcessCommand() {
   }
 #endif
 
-#ifdef SUPPORT_ETHERNET
-  if(lun[target_lun].Type == LUN_ETHERNET) {
-    int rv = target_EthernetProcess();
+#ifdef SUPPORT_ETHERNET_CABLETRON
+  if(lun[target_lun].Type == LUN_ETHERNET_CABLETRON) {
+    int rv = target_CabletronProcess();
     if(rv >= 0) return rv;
     //goto unknownCommand;
   }
 #endif
 
-  if(lun[target_lun].Type == LUN_DISK) {
+#ifdef SUPPORT_ETHERNET_SCSILINK
+  if(lun[target_lun].Type == LUN_ETHERNET_SCSILINK) {
+    int rv = target_SCSILinkProcess();
+    if(rv >= 0) return rv;
+    //goto unknownCommand;
+  }
+#endif
+
+  if(lun[target_lun].Type == LUN_DISK_GENERIC) {
     switch(target_cmdbuf[0]) {
       case CMD_TEST_UNIT_READY:     return target_CommandTestReady();
       case CMD_REZERO_UNIT:         return target_CommandReZero();
@@ -646,7 +650,7 @@ int target_ProcessCommand() {
   }
 
 #ifdef SUPPORT_OPTICAL
-  if(lun[target_lun].Type == LUN_OPTICAL) {
+  if(lun[target_lun].Type == LUN_OPTICAL_GENERIC) {
     switch(target_cmdbuf[0]) {
       case CMD_READUPDATEDBLOCK10:  return target_CommandReadUpdatedBlock();
     }

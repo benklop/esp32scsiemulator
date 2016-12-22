@@ -1,9 +1,9 @@
-#include "SCSI_Messages.h"
-#include "SCSI_Commands.h"
-#include "SCSI_Sense.h"
+#include "svcInitiator.h"
+#include "scsiMessages.h"
+#include "scsiCommands.h"
+#include "scsiSense.h"
 #include "DebugConsole.h"
-#include "NCR5380.h"
-#include "Initiator.h"
+#include "drvNCR5380.h"
 
 uint8_t initiator_id;
 uint8_t initiator_msg[16];

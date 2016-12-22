@@ -1,4 +1,5 @@
-#include "NCR5380.h"
+#include "config.h"
+#include "drvNCR5380.h"
 #include "DebugConsole.h"
 
 #define PIN_nRESET (16)

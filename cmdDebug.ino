@@ -1,7 +1,7 @@
 #include "DebugConsole.h"
 #include "cmdDispatch.h"
 #include <Cmd.h>
-#include "NCR5380.h"
+#include "drvNCR5380.h"
 
 extern uint8_t unit_attention;
 

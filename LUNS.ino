@@ -1,3 +1,4 @@
+#include "config.h"
 #include "DebugConsole.h"
 #include "LUNS.h"
 

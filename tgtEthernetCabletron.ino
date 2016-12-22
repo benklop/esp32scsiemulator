@@ -1,8 +1,8 @@
-#include "SCSI_Commands.h"
-#include "SCSI_Sense.h"
-#include <SPI.h>
-#include <EtherRaw.h>
-#include <utility/w5100.h>
+#include "config.h"
+#ifdef SUPPORT_ETHERNET_CABLETRON
+#include "scsiCommands.h"
+#include "scsiSense.h"
+#include "svcEthernet.h"
 
 typedef struct ctron_stats {
   uint32_t  frames_xmit;      /* Frames Transmitted */
@@ -64,7 +64,7 @@ static uint8_t TARGET_ETHERNET_INQUIRY_RESPONSE[] = {
   0
 };
 
-void etherInit() {
+static void etherInit() {
   W5100.init();
   SPI1.beginTransaction(SPI_ETHERNET_SETTINGS);
   W5100.setMACAddress(TARGET_ETHERNET_INQUIRY_RESPONSE+44);
@@ -75,7 +75,7 @@ void etherInit() {
 }
 
 // GetAddr Command
-int target_EthernetGetAddr() {
+static int target_CabletronGetAddr() {
   uint8_t len;
   DEBUGPRINT(DBG_TRACE, " > GetAddr");
   
@@ -100,7 +100,7 @@ int target_EthernetGetAddr() {
 }
 
 // SetAddr Command
-int target_EthernetSetAddr() {
+static int target_CabletronSetAddr() {
   uint8_t len;
   DEBUGPRINT(DBG_TRACE, " > SetAddr");
 
@@ -124,7 +124,7 @@ int target_EthernetSetAddr() {
 }
 
 // GetMedia Command
-int target_EthernetGetMedia() {
+static int target_CabletronGetMedia() {
   uint8_t len;
   DEBUGPRINT(DBG_TRACE, " > GetMedia");
   
@@ -141,7 +141,7 @@ int target_EthernetGetMedia() {
 }
 
 // GetStats Command
-int target_EthernetGetStats() {
+static int target_CabletronGetStats() {
   uint8_t len;
   DEBUGPRINT(DBG_TRACE, " > GetStats");
   
@@ -158,7 +158,7 @@ int target_EthernetGetStats() {
 }
 
 // SetMedia Command
-int target_EthernetSetMedia() {
+static int target_CabletronSetMedia() {
   DEBUGPRINT(DBG_TRACE, " > SetMedia");
 
   lun[target_lun].MediaType = target_cmdbuf[2];
@@ -167,14 +167,14 @@ int target_EthernetSetMedia() {
 }
 
 // SetMode Command
-int target_EthernetSetMode() {
+int target_CabletronSetMode() {
   DEBUGPRINT(DBG_TRACE, " > SetMode");
 
   return 0;
 }
 
 // Inquiry Command
-int target_EthernetInquiry() {
+int target_CabletronInquiry() {
   uint8_t len;
   DEBUGPRINT(DBG_TRACE, " > Inquiry");
   if(target_cmdbuf[1] & 0x3) {
@@ -221,7 +221,7 @@ int target_EthernetInquiry() {
   return target_DIN(TARGET_RESPBUF, len, 1);
 }
 
-int target_EthernetSend() {
+static int target_CabletronSend() {
   DEBUGPRINT(DBG_TRACE, " > NetSend");
   target_ether_pktbuf[0] = target_cmdbuf[3];
   target_ether_pktbuf[1] = target_cmdbuf[4];
@@ -238,21 +238,17 @@ int target_EthernetSend() {
     target_ether_pktbuf[4], target_ether_pktbuf[5],
     target_ether_pktbuf[6], target_ether_pktbuf[7]);
   // Hand packet off to ethercon
-  W5100.send_data_processing(0, target_ether_pktbuf, len);
-  W5100.execCmdSn(0, Sock_SEND_MAC);
+  target_EthernetSend(target_ether_pktbuf, len);
   EthernetStats.frames_xmit++;
   return rv;
 }
 
-int target_EthernetRecv() {
+static int target_CabletronRecv() {
+  int len;
   DEBUGPRINT(DBG_TRACE, " > NetRecv");
-  uint16_t len = W5100.getRXReceivedSize(0);
-  if(len > 0) {
-    // Get packet from ethercon
-    W5100.recv_data_processing(0, target_ether_pktbuf, len);
-    W5100.execCmdSn(0, Sock_RECV);
-  DEBUGPRINT(DBG_TRACE, " %02x%02x",
-    target_ether_pktbuf[0], target_ether_pktbuf[1]);
+  // Get packet from ethercon
+  if(len = target_EthernetRecv(target_ether_pktbuf, sizeof(target_ether_pktbuf))) {
+  DEBUGPRINT(DBG_TRACE, " %04x", len);
   DEBUGPRINT(DBG_TRACE, " %02x:%02x:%02x:%02x:%02x:%02x", 
     target_ether_pktbuf[8], target_ether_pktbuf[9],
     target_ether_pktbuf[10], target_ether_pktbuf[11],
@@ -261,14 +257,13 @@ int target_EthernetRecv() {
     target_ether_pktbuf[2], target_ether_pktbuf[3],
     target_ether_pktbuf[4], target_ether_pktbuf[5],
     target_ether_pktbuf[6], target_ether_pktbuf[7]);
-    len = (target_ether_pktbuf[0] << 8) | target_ether_pktbuf[1];
     EthernetStats.frames_rec++;
     return target_DIN(target_ether_pktbuf, len, 1);
   }
   return 0;
 }
 
-int target_EthernetAddProtocol() {
+static int target_CabletronAddProtocol() {
   DEBUGPRINT(DBG_TRACE, " > Add Protocol");
   uint16_t len = target_cmdbuf[4];
   int rv = target_DOUT(target_ether_pktbuf, len, 1);
@@ -276,7 +271,7 @@ int target_EthernetAddProtocol() {
   return rv;
 }
 
-int target_EthernetRemoveProtocol() {
+static int target_CabletronRemoveProtocol() {
   DEBUGPRINT(DBG_TRACE, " > Remove Protocol");
   uint16_t len = target_cmdbuf[4];
   int rv = target_DOUT(target_ether_pktbuf, len, 1);
@@ -284,7 +279,7 @@ int target_EthernetRemoveProtocol() {
   return rv;
 }
 
-int target_EthernetAddMulticast() {
+static int target_CabletronAddMulticast() {
   DEBUGPRINT(DBG_TRACE, " > Add Multicast");
   uint16_t len = target_cmdbuf[4];
   int rv = target_DOUT(target_ether_pktbuf, len, 1);
@@ -295,7 +290,7 @@ int target_EthernetAddMulticast() {
   return rv;
 }
 
-int target_EthernetRemoveMulticast() {
+static int target_CabletronRemoveMulticast() {
   DEBUGPRINT(DBG_TRACE, " > Remove Multicast");
   uint16_t len = target_cmdbuf[4];
   int rv = target_DOUT(target_ether_pktbuf, len, 1);
@@ -306,39 +301,41 @@ int target_EthernetRemoveMulticast() {
   return rv;
 }
 
-int target_EthernetProcess() {
+int target_CabletronProcess() {
   uint16_t ethercmd = (target_cmdbuf[0] << 8) | target_cmdbuf[1];
 
   switch(target_cmdbuf[0]) {
-    case CMD_ETHER_RECV:
-      return target_EthernetRecv();
+    case CMD_CABLETRON_RECV:
+      return target_CabletronRecv();
   }
   switch(ethercmd) {
-    case CMD_ETHER_SEND:
-      return target_EthernetSend();
-    case CMD_ETHER_ADD_PROTO:
-      return target_EthernetAddProtocol();
-    case CMD_ETHER_REM_PROTO:
-      return target_EthernetRemoveProtocol();
-    case CMD_ETHER_SET_MODE:
-      return target_EthernetSetMode();
-    case CMD_ETHER_SET_MULTI:
-      return target_EthernetAddMulticast();
-    case CMD_ETHER_REMOVE_MULTI:
-      return target_EthernetRemoveMulticast();
-    case CMD_ETHER_GET_STATS:
-	    return target_EthernetGetStats();
-    case CMD_ETHER_SET_MEDIA:
-      return target_EthernetSetMedia();
-    case CMD_ETHER_GET_MEDIA:
-      return target_EthernetGetMedia();
-    case CMD_ETHER_LOAD_IMAGE:
+    case CMD_CABLETRON_SEND:
+      return target_CabletronSend();
+    case CMD_CABLETRON_ADD_PROTO:
+      return target_CabletronAddProtocol();
+    case CMD_CABLETRON_REM_PROTO:
+      return target_CabletronRemoveProtocol();
+    case CMD_CABLETRON_SET_MODE:
+      return target_CabletronSetMode();
+    case CMD_CABLETRON_SET_MULTI:
+      return target_CabletronAddMulticast();
+    case CMD_CABLETRON_REMOVE_MULTI:
+      return target_CabletronRemoveMulticast();
+    case CMD_CABLETRON_GET_STATS:
+	    return target_CabletronGetStats();
+    case CMD_CABLETRON_SET_MEDIA:
+      return target_CabletronSetMedia();
+    case CMD_CABLETRON_GET_MEDIA:
+      return target_CabletronGetMedia();
+    case CMD_CABLETRON_LOAD_IMAGE:
       DEBUGPRINT(DBG_TRACE, " > LoadImage");
 	    return -1;
-    case CMD_ETHER_SET_ADDR:
-	    return target_EthernetSetAddr();
-    case CMD_ETHER_GET_ADDR:
-	    return target_EthernetGetAddr();
+    case CMD_CABLETRON_SET_ADDR:
+	    return target_CabletronSetAddr();
+    case CMD_CABLETRON_GET_ADDR:
+	    return target_CabletronGetAddr();
   }
   return -1;
 }
+
+#endif

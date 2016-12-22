@@ -21,9 +21,10 @@ typedef struct LUN_s {
 extern LUN_t lun[MAXLUNS];
 extern volatile uint8_t luns;
 
-#define LUN_DISK     0x1
-#define LUN_OPTICAL  0x2
-#define LUN_ETHERNET 0x3
-#define LUN_TAPE     0x4
+#define LUN_DISK_GENERIC       0x11
+#define LUN_OPTICAL_GENERIC    0x21
+#define LUN_TAPE_GENERIC       0x31
+#define LUN_ETHERNET_CABLETRON 0x41
+#define LUN_ETHERNET_SCSILINK  0x42
 
 #endif

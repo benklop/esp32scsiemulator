@@ -1,6 +1,9 @@
+#ifndef DEBUG_CONSOLE_H
+#define DEBUG_CONSOLE_H
+#include "config.h"
+
 extern int verbosity;
 
-#define DEBUG
 #ifdef DEBUG
 #define DEBUGPRINT(x, ...) { if(x & verbosity) if(Serial) Serial.printf(__VA_ARGS__); }
 #define CHECKCONSOLE()  { if(Serial.available()) return 1; }
@@ -22,3 +25,4 @@ extern int verbosity;
 #define DBG_PIO      0x100
 #define DBG_HOLYCRAP 0x200
 
+#endif /* DEBUG_CONSOLE_H */

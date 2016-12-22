@@ -1,3 +1,4 @@
+#include "config.h"
 #include "DebugConsole.h"
 #include "LUNS.h"
 #include "sdhc.h"
@@ -49,12 +50,12 @@ void ParseMBR(int Table) {
         // Find first unused disk LUN
         for(tLUN = 0; tLUN < MAXLUNS; tLUN++) {
            if (!lun[tLUN].Enabled) continue;
-           if (lun[tLUN].Type != LUN_DISK) continue;
+           if (lun[tLUN].Type != LUN_DISK_GENERIC) continue;
            if (lun[tLUN].Size != 0) continue;
            break;
         }
         if(tLUN < MAXLUNS) {
-          lun[tLUN].Type = LUN_DISK;
+          lun[tLUN].Type = LUN_DISK_GENERIC;
           lun[tLUN].Offset = pTable[Table].Offset + pOffset;
           lun[tLUN].Size = pSize;
           lun[tLUN].Mounted = 1;
@@ -64,12 +65,12 @@ void ParseMBR(int Table) {
       case 0xf9: // Optical LUN
         for(tLUN = 0; tLUN < MAXLUNS; tLUN++) {
            if (!lun[tLUN].Enabled) continue;
-           if (lun[tLUN].Type != LUN_OPTICAL) continue;
+           if (lun[tLUN].Type != LUN_OPTICAL_GENERIC) continue;
            if (lun[tLUN].Size != 0) continue;
            break;
         }
         if(tLUN < MAXLUNS) {
-          lun[tLUN].Type = LUN_OPTICAL;
+          lun[tLUN].Type = LUN_OPTICAL_GENERIC;
           lun[tLUN].Offset = pTable[Table].Offset + pOffset;
           lun[tLUN].Size = pSize;
           lun[tLUN].Mounted = 1;

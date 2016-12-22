@@ -87,16 +87,19 @@ void show_luns(int argc, char **argv) {
   for(ii=0; ii<MAXLUNS; ii++) {
     if(lun[ii].Enabled) {
       switch(lun[ii].Type) {
-        case LUN_DISK:
+        case LUN_DISK_GENERIC:
           DEBUGPRINT(DBG_GENERAL, "%d: %9d \t%9d \t%08x DISK\r\n", ii, lun[ii].Offset, (lun[ii].Offset + lun[ii].Size), lun[ii].Size); 
           break;
-        case LUN_OPTICAL:
+        case LUN_OPTICAL_GENERIC:
           DEBUGPRINT(DBG_GENERAL, "%d: %9d \t%9d \t%08x CDROM\r\n", ii, lun[ii].Offset, (lun[ii].Offset + lun[ii].Size), lun[ii].Size); 
           break;
-        case LUN_ETHERNET:
-          DEBUGPRINT(DBG_GENERAL, "%d: %9d \t%9d \t%08x ETHERNET\r\n", ii, lun[ii].Offset, (lun[ii].Offset + lun[ii].Size), lun[ii].Size); 
+        case LUN_ETHERNET_CABLETRON:
+          DEBUGPRINT(DBG_GENERAL, "%d: %9d \t%9d \t%08x ETH CABLETRON\r\n", ii, lun[ii].Offset, (lun[ii].Offset + lun[ii].Size), lun[ii].Size); 
           break;
-        case LUN_TAPE:
+        case LUN_ETHERNET_SCSILINK:
+          DEBUGPRINT(DBG_GENERAL, "%d: %9d \t%9d \t%08x ETH SCSILINK\r\n", ii, lun[ii].Offset, (lun[ii].Offset + lun[ii].Size), lun[ii].Size); 
+          break;
+        case LUN_TAPE_GENERIC:
           DEBUGPRINT(DBG_GENERAL, "%d: %9d \t%9d \t%08x TAPE\r\n", ii, lun[ii].Offset, (lun[ii].Offset + lun[ii].Size), lun[ii].Size); 
           break;
       }

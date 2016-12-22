@@ -87,18 +87,24 @@ void lun_setup(int argc, char **argv) {
         continue;
       }
       if(!strcmp(argv[ii], "disk")) {
-        lun[sLUN].Type = LUN_DISK;
+        lun[sLUN].Type = LUN_DISK_GENERIC;
         continue;
       }
 #ifdef SUPPORT_OPTICAL
       if(!strcmp(argv[ii], "optical")) {
-        lun[sLUN].Type = LUN_OPTICAL;
+        lun[sLUN].Type = LUN_OPTICAL_GENERIC;
         continue;
       }
 #endif
-#ifdef SUPPORT_ETHERNET
-      if(!strcmp(argv[ii], "ethernet")) {
-        lun[sLUN].Type = LUN_ETHERNET;
+#ifdef SUPPORT_ETHERNET_CABLETRON
+      if(!strcmp(argv[ii], "eth_cabletron")) {
+        lun[sLUN].Type = LUN_ETHERNET_CABLETRON;
+        continue;
+      }
+#endif
+#ifdef SUPPORT_ETHERNET_SCSILINK
+      if(!strcmp(argv[ii], "eth_scsilink")) {
+        lun[sLUN].Type = LUN_ETHERNET_SCSILINK;
         continue;
       }
 #endif

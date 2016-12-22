@@ -1,5 +1,6 @@
-#include "SCSI_Commands.h"
-#include "SCSI_Sense.h"
+#include "config.h"
+#include "scsiCommands.h"
+#include "scsiSense.h"
 #include "LUNS.h"
 
 static uint8_t TARGET_DISKBUF[64*1024];
