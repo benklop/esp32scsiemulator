@@ -76,7 +76,7 @@ int target_DiskInquiry() {
 
 int target_DiskModeSense6() {
   unsigned int len;
-  uint8_t page, pagemax, pagemin;
+  int page, pagemax, pagemin;
   DEBUGPRINT(DBG_TRACE, " > Mode Sense (6)");
   /* Check whether medium is present */
   if(target_CheckMedium()) return 0;
@@ -93,15 +93,16 @@ int target_DiskModeSense6() {
   if (target_cmdbuf[1] & 0x08) {
     TARGET_RESPBUF[len++] = 0;             /* No block descriptor */
   } else {
+    uint32_t cap = (lun[target_lun].Cylinders * lun[target_lun].Heads * lun[target_lun].Sectors) - 1;
     TARGET_RESPBUF[len++] = 8;             /* Block descriptor length */
-    TARGET_RESPBUF[len++] = 0;             /* Block descriptor */
-    TARGET_RESPBUF[len++] = 0;             /* Volume Size */
-    TARGET_RESPBUF[len++] = 0;
-    TARGET_RESPBUF[len++] = 0;
-    TARGET_RESPBUF[len++] = 0;             /* Sector Size */
-    TARGET_RESPBUF[len++] = 0;
-    TARGET_RESPBUF[len++] = 2;
-    TARGET_RESPBUF[len++] = 0;
+    TARGET_RESPBUF[len++] = (cap >> 24) & 0xff;
+    TARGET_RESPBUF[len++] = (cap >> 16) & 0xff;
+    TARGET_RESPBUF[len++] = (cap >> 8) & 0xff;
+    TARGET_RESPBUF[len++] = cap & 0xff;
+    TARGET_RESPBUF[len++] = (lun[target_lun].SectorSize >> 24) & 0xff;
+    TARGET_RESPBUF[len++] = (lun[target_lun].SectorSize >> 16) & 0xff;
+    TARGET_RESPBUF[len++] = (lun[target_lun].SectorSize >> 8) & 0xff;
+    TARGET_RESPBUF[len++] = (lun[target_lun].SectorSize) & 0xff;
   }
 
   /* Check for requested mode page */
@@ -355,13 +356,108 @@ int target_DiskGroup1Verify() {
   return 0;
 }
 
+int target_ReadBytes(uint32_t sectorOffset, uint32_t sectorCount) {
+  uint32_t multiblock = (sizeof(TARGET_DISKBUF)/512);
+  DEBUGPRINT(DBG_TRACE, "\n\r> R %d %d", sectorOffset, sectorCount);
+
+  uint64_t byteOffset = ((uint64_t)sectorOffset) * lun[target_lun].SectorSize;
+  sectorOffset = byteOffset / 512;
+  uint64_t byteCount = ((uint64_t)sectorCount) * lun[target_lun].SectorSize;
+  sectorCount = byteCount / 512;
+  uint32_t sectorAlignmentOffset = byteOffset & 0x1ff;
+
+  // If virtual sectors are smaller then we need to read an extra physical sector
+  if(lun[target_lun].SectorSize < 512)
+    sectorCount++;
+
+  lun[target_lun].Active = 0x21;
+
+  DEBUGPRINT(DBG_TRACE, " > TR %d %d", sectorOffset, sectorCount);
+
+  // Check if sector is outside LUN
+  if((sectorOffset + sectorCount) > lun[target_lun].Size) {
+    target_status = STATUS_CHECK;
+    target_sense[target_lun].key = ILLEGAL_REQUEST; // Illegal Request
+    target_sense[target_lun].code = INVALID_LBA; // LBA Out of range
+    return 0;
+  }
+
+  sectorOffset += lun[target_lun].Offset;
+
+  // Handle unaligned reads
+  if(sectorAlignmentOffset) {
+    DRESULT res = SDHC_ReadBlocks((UCHAR*) TARGET_DISKBUF, (DWORD) sectorOffset, 1);
+    if(res != RES_OK) {
+      target_status = STATUS_CHECK;
+      target_sense[target_lun].key = MEDIUM_ERROR;
+      return 0;
+    }
+    SDHC_DMAWait();
+
+    // Send it
+    if(target_DIN(TARGET_DISKBUF+sectorAlignmentOffset, 512-sectorAlignmentOffset, 1)) return 1;
+
+    // Check/Process Host Messages
+    if(target_MessageProcess()) return 1;
+
+    sectorOffset ++;
+    sectorCount --;
+    byteOffset += 512-sectorAlignmentOffset;
+    byteCount -= 512-sectorAlignmentOffset;
+  }
+
+  while(byteCount > 512) {
+    if(byteCount < 512*multiblock) {
+      multiblock = byteCount / 512;
+    }
+
+    DRESULT res = SDHC_ReadBlocks((UCHAR*) TARGET_DISKBUF, (DWORD) sectorOffset, multiblock);
+    if(res != RES_OK) {
+      target_status = STATUS_CHECK;
+      target_sense[target_lun].key = MEDIUM_ERROR;
+      return 0;
+    }
+    SDHC_DMAWait();
+
+    // Send it
+    if(target_DIN(TARGET_DISKBUF, 512, multiblock)) return 1;
+
+    // Check/Process Host Messages
+    if(target_MessageProcess()) return 1;
+
+    sectorOffset += multiblock;
+    sectorCount -= multiblock;
+    byteOffset += 512*multiblock;
+    byteCount -= 512*multiblock;
+  }
+
+  if(byteCount > 0) {
+    DRESULT res = SDHC_ReadBlocks((UCHAR*) TARGET_DISKBUF, (DWORD) sectorOffset, 1);
+    if(res != RES_OK) {
+      target_status = STATUS_CHECK;
+      target_sense[target_lun].key = MEDIUM_ERROR;
+      return 0;
+    }
+    SDHC_DMAWait();
+
+    // Send it
+    if(target_DIN(TARGET_DISKBUF, lun[target_lun].SectorSize, byteCount / lun[target_lun].SectorSize)) return 1;
+
+    // Check/Process Host Messages
+    if(target_MessageProcess()) return 1;
+  }
+
+  return 0;
+}
+
 // Read sectors from device
 // TODO: Interleave Card and SCSI DMA, Make SCSI DMA servicing an ISR.
 int target_ReadSectors(uint32_t sectorOffset, uint32_t sectorCount) {
-  uint16_t multiblock = (sizeof(TARGET_DISKBUF)/512);
-  int tSCSI = 0;
-  int tCard = 0;
-  int tMessage = 0;
+  uint32_t multiblock = (sizeof(TARGET_DISKBUF)/512);
+
+  if(lun[target_lun].SectorSize != 512) {
+    return target_ReadBytes(sectorOffset, sectorCount);
+  }
 
   lun[target_lun].Active = 0x21;
 
@@ -376,8 +472,6 @@ int target_ReadSectors(uint32_t sectorOffset, uint32_t sectorCount) {
 
   sectorOffset += lun[target_lun].Offset;
   while(sectorCount > 0) {
-    elapsedMillis diskTime;
-    diskTime = 0;
     if(sectorCount < multiblock) {
       multiblock = sectorCount;
     }
@@ -388,21 +482,139 @@ int target_ReadSectors(uint32_t sectorOffset, uint32_t sectorCount) {
       return 0;
     }
     SDHC_DMAWait();
-    tCard += diskTime; diskTime = 0;
 
     // Send it
     if(target_DIN(TARGET_DISKBUF, 512, multiblock)) return 1;
-    tSCSI += diskTime; diskTime = 0;
 
     // Check/Process Host Messages
     if(target_MessageProcess()) return 1;
-    tMessage += diskTime; diskTime = 0;
 
     sectorOffset += multiblock;
     sectorCount -= multiblock;
   }
 
-  DEBUGPRINT(DBG_TRACE, " S:%d/C:%d/M:%d ms ", tSCSI, tCard, tMessage);
+  return 0;
+}
+
+// Write sectors to device
+int target_WriteBytes(uint32_t sectorOffset, uint32_t sectorCount) {
+  uint16_t multiblock = (sizeof(TARGET_DISKBUF)/512);
+  DRESULT res;
+
+  if(lun[target_lun].SectorSize != 512) {
+    return target_WriteBytes(sectorOffset, sectorCount);
+  }
+
+  lun[target_lun].Active = 0x41;
+
+  if(lun[target_lun].WriteProtect) {
+    target_status = STATUS_CHECK;
+    target_sense[target_lun].key = MEDIUM_ERROR;
+    target_sense[target_lun].code = 0x0c; // Write Error
+    return 0;
+  }
+
+  uint64_t byteOffset = ((uint64_t)sectorOffset) * lun[target_lun].SectorSize;
+  sectorOffset = byteOffset / 512;
+  uint64_t byteCount = ((uint64_t)sectorCount) * lun[target_lun].SectorSize;
+  sectorCount = byteCount / 512;
+  uint32_t sectorAlignmentOffset = byteOffset & 0x1ff;
+
+  // If virtual sectors are smaller then we need to read an extra physical sector
+  if(lun[target_lun].SectorSize < 512)
+    sectorCount++;
+
+  DEBUGPRINT(DBG_TRACE, " > TR %d %d", sectorOffset, sectorCount);
+
+  // Check if sector is outside LUN
+  if((sectorOffset + sectorCount) > lun[target_lun].Size) {
+    target_status = STATUS_CHECK;
+    target_sense[target_lun].key = ILLEGAL_REQUEST; // Illegal Request
+    target_sense[target_lun].code = INVALID_LBA; // LBA Out of range
+    return 0;
+  }
+
+  sectorOffset += lun[target_lun].Offset;
+
+  // Handle unaligned writes
+  if(sectorAlignmentOffset) {
+    res = SDHC_ReadBlocks((UCHAR*) TARGET_DISKBUF, (DWORD) sectorOffset, 1);
+    if(res != RES_OK) {
+      target_status = STATUS_CHECK;
+      target_sense[target_lun].key = MEDIUM_ERROR;
+      return 0;
+    }
+    SDHC_DMAWait();
+
+    // Get it
+    if(target_DOUT(TARGET_DISKBUF+sectorAlignmentOffset, 512-sectorAlignmentOffset, 1)) return 1;
+
+    res = SDHC_WriteBlocks((UCHAR*) TARGET_DISKBUF, (DWORD) sectorOffset, 1);
+    if(res != RES_OK) {
+      target_status = STATUS_CHECK;
+      target_sense[target_lun].key = MEDIUM_ERROR;
+      return 0;
+    }
+    SDHC_DMAWait();
+
+    // Check/Process Host Messages
+    if(target_MessageProcess()) return 1;
+
+    sectorOffset ++;
+    sectorCount --;
+    byteOffset += 512-sectorAlignmentOffset;
+    byteCount -= 512-sectorAlignmentOffset;
+  }
+
+  while(byteCount > 512) {
+    if(byteCount < 512*multiblock) {
+      multiblock = byteCount / 512;
+    }
+
+    // Send it
+    if(target_DOUT(TARGET_DISKBUF, 512, multiblock)) return 1;
+
+    // Write Sector
+    res = SDHC_WriteBlocks((UCHAR*) TARGET_DISKBUF, (DWORD) sectorOffset, multiblock);
+    if(res != RES_OK) {
+      target_status = STATUS_CHECK;
+      target_sense[target_lun].key = MEDIUM_ERROR;
+      return 0;
+    }
+    SDHC_DMAWait();
+
+    // Check/Process Host Messages
+    if(target_MessageProcess()) return 1;
+
+    sectorOffset += multiblock;
+    sectorCount -= multiblock;
+    byteOffset += 512*multiblock;
+    byteCount -= 512*multiblock;
+  }
+
+  if(byteCount > 0) {
+    res = SDHC_ReadBlocks((UCHAR*) TARGET_DISKBUF, (DWORD) sectorOffset, 1);
+    if(res != RES_OK) {
+      target_status = STATUS_CHECK;
+      target_sense[target_lun].key = MEDIUM_ERROR;
+      return 0;
+    }
+    SDHC_DMAWait();
+
+    // Get it
+    if(target_DOUT(TARGET_DISKBUF, lun[target_lun].SectorSize, byteCount / lun[target_lun].SectorSize)) return 1;
+
+    res = SDHC_WriteBlocks((UCHAR*) TARGET_DISKBUF, (DWORD) sectorOffset, 1);
+    if(res != RES_OK) {
+      target_status = STATUS_CHECK;
+      target_sense[target_lun].key = MEDIUM_ERROR;
+      return 0;
+    }
+    SDHC_DMAWait();
+
+    // Check/Process Host Messages
+    if(target_MessageProcess()) return 1;
+  }
 
   return 0;
 }
@@ -410,9 +622,10 @@ int target_ReadSectors(uint32_t sectorOffset, uint32_t sectorCount) {
 // Write sectors to device
 int target_WriteSectors(uint32_t sectorOffset, uint32_t sectorCount) {
   uint16_t multiblock = (sizeof(TARGET_DISKBUF)/512);
-  int tSCSI = 0;
-  int tCard = 0;
-  int tMessage = 0;
+
+  if(lun[target_lun].SectorSize != 512) {
+    return target_WriteBytes(sectorOffset, sectorCount);
+  }
 
   lun[target_lun].Active = 0x41;
 
@@ -434,14 +647,11 @@ int target_WriteSectors(uint32_t sectorOffset, uint32_t sectorCount) {
 
   sectorOffset += lun[target_lun].Offset;
   while(sectorCount > 0) {
-    elapsedMillis diskTime;
-    diskTime = 0;
     if(sectorCount < multiblock) {
       multiblock = sectorCount;
     }
     // Send it
     if(target_DOUT(TARGET_DISKBUF, 512, multiblock)) return 1;
-    tSCSI += diskTime; diskTime = 0;
 
     // Write Sector
     DRESULT res = SDHC_WriteBlocks((UCHAR*) TARGET_DISKBUF, (DWORD) sectorOffset, multiblock);
@@ -451,17 +661,13 @@ int target_WriteSectors(uint32_t sectorOffset, uint32_t sectorCount) {
       return 0;
     }
     SDHC_DMAWait();
-    tCard += diskTime; diskTime = 0;
 
     // Check/Process Host Messages
     if(target_MessageProcess()) return 1;
-    tMessage += diskTime; diskTime = 0;
 
     sectorOffset += multiblock;
     sectorCount -= multiblock;
   }
-
-  DEBUGPRINT(DBG_TRACE, " S:%d/C:%d/M:%d ms ", tSCSI, tCard, tMessage);
 
   return 0;
 }

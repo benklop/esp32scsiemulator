@@ -26,6 +26,7 @@
 #define CMD_START_STOP_UNIT       0x1B  /* Optional */
 #define CMD_RECV_DIAGNOSTIC       0x1C
 #define CMD_SEND_DIAGNOSTIC       0x1D
+#define CMD_PREVENT_REMOVAL       0x1E
 /* 10 Byte command opcodes */
 #define CMD_READ_CAPACITY10       0x25
 #define CMD_READ10                0x28
@@ -42,6 +43,11 @@
 #define CMD_READBUFFER            0x3C  /* Optional */
 #define CMD_READLONG10            0x3E  /* Optional */
 #define CMD_WRITELONG10           0x3F  /* Optional */
+#define CMD_READ_TOC              0x43
+#define CMD_READ_HEADER           0x44
+#define CMD_GET_CONFIGURATION     0x46
+#define CMD_GET_EVENT_STATUS_NOTIFICATION 0x4a
+#define CMD_READ_DISC_INFORMATION 0x51
 #define CMD_RESERVE10             0x56
 #define CMD_RELEASE10             0x57
 /* 12 Byte command opcodes */

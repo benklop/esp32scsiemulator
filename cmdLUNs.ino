@@ -139,10 +139,17 @@ void lun_setup(int argc, char **argv) {
       }
       if(!strcmp(argv[ii], "size")) {
         lun[sLUN].Size = cmdStr2Num(argv[ii+1], 10);
-        lun[sLUN].Sectors = 16;
-        lun[sLUN].SectorSize = 512;
-        lun[sLUN].Heads = 16;
-        lun[sLUN].Cylinders = lun[sLUN].Size / (lun[sLUN].Heads * lun[sLUN].Sectors);
+        if(lun[sLUN].Type == LUN_DISK_GENERIC) {
+          lun[sLUN].Sectors = 16;
+          lun[sLUN].SectorSize = 512;
+          lun[sLUN].Heads = 16;
+        }
+        if(lun[sLUN].Type == LUN_OPTICAL_GENERIC) {
+          lun[sLUN].Sectors = 1;
+          lun[sLUN].SectorSize = 2048;
+          lun[sLUN].Heads = 1;
+        }
+        lun[sLUN].Cylinders = (lun[sLUN].Size * 512) / (lun[sLUN].Heads * lun[sLUN].Sectors * lun[sLUN].SectorSize);
         ii++;
         continue;
       }
@@ -183,6 +190,10 @@ void lun_setup(int argc, char **argv) {
     DEBUGPRINT(DBG_GENERAL, "Type: %d\r\n", lun[sLUN].Type);
     DEBUGPRINT(DBG_GENERAL, "Offset: %d\r\n", lun[sLUN].Offset);
     DEBUGPRINT(DBG_GENERAL, "Size: %d\r\n", lun[sLUN].Size);
+    DEBUGPRINT(DBG_GENERAL, "Cylinders: %d\r\n", lun[sLUN].Cylinders);
+    DEBUGPRINT(DBG_GENERAL, "Heads: %d\r\n", lun[sLUN].Heads);
+    DEBUGPRINT(DBG_GENERAL, "Sectors: %d\r\n", lun[sLUN].Sectors);
+    DEBUGPRINT(DBG_GENERAL, "SectorSize: %d\r\n", lun[sLUN].SectorSize);
   }
 }
 

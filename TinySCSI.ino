@@ -23,7 +23,6 @@ extern SD_CARD_DESCRIPTOR sdCardDesc;
 void setup() {
   int ii;
   uint8_t sID;
-  char strSize[16];
 
 #ifdef DEBUG_WAIT
   while(!Serial);
@@ -79,12 +78,12 @@ void setup() {
     }
   }
 
-  DEBUGPRINT(DBG_GENERAL, "TSE %s\r\n", strSize);
+  DEBUGPRINT(DBG_GENERAL, "TSE %4lu GB\r\n", (sdCardDesc.numBlocks / 2000000));
 
   execHandler((char*)"autoexec.tse");
 
-//  if(target_interrupt == 1)
-//    target_Process();
+  if(target_interrupt == 1)
+    target_Process();
   
   // Show the prompt
 #ifdef DEBUG

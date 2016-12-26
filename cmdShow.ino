@@ -17,7 +17,10 @@ PartType_t PartType[] = {
   { 0x0c, "FAT32 LBA" },
   { 0x0e, "FAT16 LBA" },
   { 0x0f, "Extended LBA" },
-  { 0xf8, "TeensySCSI LUN" },
+  { 0xf8, "TinySCSI Disk LUN" },
+  { 0xf9, "TinySCSI Optical LUN" },
+  { 0xfa, "Cabletron Ethernet LUN" },
+  { 0xfb, "SCSI/Link Ethernet LUN" },
   { 0xff, NULL }
 };
 

@@ -65,6 +65,7 @@ void ParseMBR(int Table) {
           lun[tLUN].Mounted = 1;
           luns++;
         }
+        break;
 #ifdef SUPPORT_OPTICAL
       case 0xf9: // Optical LUN
         for(tLUN = 0; tLUN < MAXLUNS; tLUN++) {
@@ -77,9 +78,14 @@ void ParseMBR(int Table) {
           lun[tLUN].Type = LUN_OPTICAL_GENERIC;
           lun[tLUN].Offset = pTable[Table].Offset + pOffset;
           lun[tLUN].Size = pSize;
+          lun[tLUN].Sectors = 1;
+          lun[tLUN].SectorSize = 2048;
+          lun[tLUN].Heads = 1;
+          lun[tLUN].Cylinders = (pSize * 512) / (lun[tLUN].Heads * lun[tLUN].Sectors * lun[tLUN].SectorSize);
           lun[tLUN].Mounted = 1;
           luns++;
         }
+        break;
 #endif
 #ifdef SUPPORT_ETHERNET_CABLETRON
       case 0xfa: // Ethernet Cabletron
@@ -95,6 +101,7 @@ void ParseMBR(int Table) {
           lun[tLUN].Size = pSize;
           luns++;
         }
+        break;
 #endif
 #ifdef SUPPORT_ETHERNET_SCSILINK
       case 0xfb: // Ethernet SCSILink
@@ -110,10 +117,11 @@ void ParseMBR(int Table) {
           lun[tLUN].Size = pSize;
           luns++;
         }
+        break;
 #endif
-default:
-        pTable[Table].Part[part].Offset = pTable[Table].Offset + pOffset;
     }
+    if(pType)
+      pTable[Table].Part[part].Offset = pTable[Table].Offset + pOffset;
   }
 }
 

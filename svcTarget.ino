@@ -674,11 +674,19 @@ targetInit:
 void target_SetID(int ID) {
   ID &= 7;
   target_idmask |= (1<<ID);
+  if(target_phase == PHASE_SELECT) {
+    ncr_WriteRegister(SELECT_ENABLE_REG, target_idmask);
+    ncr_ReadRegister(RESET_PARITY_INTERRUPT_REG);
+  }
 }
 
 void target_ClearID(int ID) {
   ID &= 7;
   target_idmask &= ~(1<<ID);
+  if(target_phase == PHASE_SELECT) {
+    ncr_WriteRegister(SELECT_ENABLE_REG, target_idmask);
+    ncr_ReadRegister(RESET_PARITY_INTERRUPT_REG);
+  }
 }
 
 int target_GetID() {
