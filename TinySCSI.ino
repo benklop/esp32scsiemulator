@@ -58,7 +58,6 @@ void setup() {
   // Enable default LUNs
   for(ii=0;ii<MAXLUNS;ii+=8) {
     lun[ii].Enabled = 1;
-    lun[ii].Type = LUN_DISK_GENERIC;
   }
 
   execHandler((char*)"config.tse");
@@ -84,8 +83,8 @@ void setup() {
 
   execHandler((char*)"autoexec.tse");
 
-  if(target_interrupt == 1)
-    target_Process();
+//  if(target_interrupt == 1)
+//    target_Process();
   
   // Show the prompt
 #ifdef DEBUG

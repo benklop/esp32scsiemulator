@@ -152,6 +152,18 @@
 
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
  X                                                   X
+ X  Optical Emulations - Pick ANY                    X
+ X                                                   X
+ XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX*/
+ 
+/*****************************************************
+ * Generic CD-ROM - NEEDS WORK
+*/
+#define SUPPORT_OPTICAL
+
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+ X                                                   X
  X  General SCSI Commands - Adjust to suit host      X
  X                                                   X
  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX*/

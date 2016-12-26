@@ -113,8 +113,36 @@ void lun_setup(int argc, char **argv) {
         ii++;
         continue;
       }
+      if(!strcmp(argv[ii], "sectorsize")) {
+        lun[sLUN].SectorSize = cmdStr2Num(argv[ii+1], 10);
+        lun[sLUN].Size = lun[sLUN].Cylinders * lun[sLUN].Heads * ((lun[sLUN].Sectors * lun[sLUN].SectorSize) / 512);
+        ii++;
+        continue;
+      }
+      if(!strcmp(argv[ii], "cylinders")) {
+        lun[sLUN].Cylinders = cmdStr2Num(argv[ii+1], 10);
+        lun[sLUN].Size = lun[sLUN].Cylinders * lun[sLUN].Heads * ((lun[sLUN].Sectors * lun[sLUN].SectorSize) / 512);
+        ii++;
+        continue;
+      }
+      if(!strcmp(argv[ii], "heads")) {
+        lun[sLUN].Heads = cmdStr2Num(argv[ii+1], 10);
+        lun[sLUN].Size = lun[sLUN].Cylinders * lun[sLUN].Heads * ((lun[sLUN].Sectors * lun[sLUN].SectorSize) / 512);
+        ii++;
+        continue;
+      }
+      if(!strcmp(argv[ii], "sectors")) {
+        lun[sLUN].Sectors = cmdStr2Num(argv[ii+1], 10);
+        lun[sLUN].Size = lun[sLUN].Cylinders * lun[sLUN].Heads * ((lun[sLUN].Sectors * lun[sLUN].SectorSize) / 512);
+        ii++;
+        continue;
+      }
       if(!strcmp(argv[ii], "size")) {
         lun[sLUN].Size = cmdStr2Num(argv[ii+1], 10);
+        lun[sLUN].Sectors = 16;
+        lun[sLUN].SectorSize = 512;
+        lun[sLUN].Heads = 16;
+        lun[sLUN].Cylinders = lun[sLUN].Size / (lun[sLUN].Heads * lun[sLUN].Sectors);
         ii++;
         continue;
       }
@@ -136,6 +164,15 @@ void lun_setup(int argc, char **argv) {
       if(!strcmp(argv[ii], "serial")) {
         spcopy(lun[sLUN].Unique, argv[ii+1], 8);
         ii++;
+        continue;
+      }
+      if(!strcmp(argv[ii], "quirks")) {
+        ii++;
+        if(!strcmp(argv[ii], "+apple")) {
+          lun[sLUN].Quirks |= QUIRKS_APPLE;
+        } else if(!strcmp(argv[ii], "-apple")) {
+          lun[sLUN].Quirks &= ~QUIRKS_APPLE;
+        }
         continue;
       }
     }

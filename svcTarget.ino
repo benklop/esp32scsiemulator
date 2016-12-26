@@ -199,12 +199,6 @@ int target_CommandTestReady() {
   return 0;
 }
 
-// ReZero Unit - Returns with Good Status
-int target_CommandReZero() {
-  DEBUGPRINT(DBG_TRACE, " > ReZero");
-  return 0;
-}
-
 // Sense
 int target_CommandSense() {
   uint8_t len = 18;
@@ -252,128 +246,6 @@ int target_CommandSense() {
   return target_DIN(TARGET_RESPBUF, len, 1);
 }
 
-int target_CommandModeSense6() {
-  unsigned int len, i, ii;
-  DEBUGPRINT(DBG_TRACE, " > Mode Sense (6)");
-  /* Check whether medium is present */
-  if(target_CheckMedium()) return 0;
-
-  memset(TARGET_RESPBUF, 0, sizeof(TARGET_RESPBUF));
-
-  /* Check for requested mode page */
-  switch (target_cmdbuf[2] & 0x3F) {
-    case VENDOR_SPECIFIC:
-      /* Accept request only for current values */
-      if (target_cmdbuf[2] & 0xC0) {
-        /* Prepare sense data */
-        target_status = STATUS_CHECK;
-        target_sense[target_lun].key = ILLEGAL_REQUEST;
-        target_sense[target_lun].code = INVALID_FIELD_IN_CDB;    /* "Invalid field in CDB" */
-        target_sense[target_lun].key_specific[0] = ERROR_IN_OPCODE;  /* "Error in Byte 2" */
-        target_sense[target_lun].key_specific[1] = 0x00;
-        target_sense[target_lun].key_specific[2] = 0x02;
-        return 0;
-      }
-
-      /* Create parameter list header */
-      if (target_cmdbuf[1] & 0x08)  /* Check for DBD */
-        TARGET_RESPBUF[0] = 3;             /* List length (4 - 1 Byte) */
-      else
-        TARGET_RESPBUF[0] = 11;            /* List length (12 - 1 Byte) */
-      TARGET_RESPBUF[1] = 0;                /* Default medium type */
-      if (lun[target_lun].WriteProtect)
-        TARGET_RESPBUF[2] = 0x80;          /* Write protected */
-      else
-        TARGET_RESPBUF[2] = 0;             /* Writable */
-      /* Add block descriptor if DBD is not set */
-      if (target_cmdbuf[1] & 0x08) {
-        TARGET_RESPBUF[3] = 0;             /* No block descriptor */
-        len = 4;
-      } else {
-        TARGET_RESPBUF[3] = 8;             /* Block descriptor length */
-        TARGET_RESPBUF[4] = 0;             /* Block descriptor */
-        TARGET_RESPBUF[5] = 0;
-        TARGET_RESPBUF[6] = 0;
-        TARGET_RESPBUF[7] = 0;
-        TARGET_RESPBUF[8] = 0;
-        TARGET_RESPBUF[9] = 0;
-        TARGET_RESPBUF[10] = 2;
-        TARGET_RESPBUF[11] = 0;
-        len = 12;
-      }
-      break;
-    case RW_ERROR_RECOVERY:
-    case ALL_PAGES:
-      /* Create parameter list header */
-      if (target_cmdbuf[1] & 0x08)  /* Check for DBD */
-        TARGET_RESPBUF[0] = 15;            /* List length (16 - 1 Byte) */
-      else
-        TARGET_RESPBUF[0] = 23;            /* List length (24 - 1 Byte) */
-      TARGET_RESPBUF[1] = 0;                /* Default medium type */
-      if (lun[target_lun].WriteProtect)
-        TARGET_RESPBUF[2] = 0x80;          /* Write protected */
-      else
-        TARGET_RESPBUF[2] = 0;             /* Writable */
-      /* Add block descriptor if DBD is not set */
-      if (target_cmdbuf[1] & 0x08) {
-        TARGET_RESPBUF[3] = 0;             /* No block descriptor */
-        i = 4;
-      } else {
-        TARGET_RESPBUF[3] = 8;             /* Block descriptor length */
-        TARGET_RESPBUF[4] = 0;             /* Block descriptor */
-        TARGET_RESPBUF[5] = 0;
-        TARGET_RESPBUF[6] = 0;
-        TARGET_RESPBUF[7] = 0;
-        TARGET_RESPBUF[8] = 0;
-        TARGET_RESPBUF[9] = 0;
-        TARGET_RESPBUF[10] = 2;
-        TARGET_RESPBUF[11] = 0;
-        i = 12;
-      }
-      /* Check for changeable values request */
-      if ((target_cmdbuf[2] & 0xC0) == 0x40) {
-        TARGET_RESPBUF[i] = 0x01;          /* Page code */
-        TARGET_RESPBUF[i + 1] = 0x0A;      /* Page size */
-        /* No changeable values, set all fields to zero */
-        for (ii = 2; ii < 12; ii++) TARGET_RESPBUF[i + ii] = 0x00;
-      } else {
-        /* Add read/write error recovery mode page */
-        TARGET_RESPBUF[i] = 0x01;          /* Page code */
-        TARGET_RESPBUF[i + 1] = 0x0A;      /* Page size */
-        TARGET_RESPBUF[i + 2] = lun[target_lun].ReportAutoCorrect ? 0xC0 : 0x00;   /* Config bits */
-        TARGET_RESPBUF[i + 3] = 0;         /* Read retry count */
-        TARGET_RESPBUF[i + 4] = 0;
-        TARGET_RESPBUF[i + 5] = 0;
-        TARGET_RESPBUF[i + 6] = 0;
-        TARGET_RESPBUF[i + 7] = 0;
-        TARGET_RESPBUF[i + 8] = 0;         /* Write retry count */
-        TARGET_RESPBUF[i + 9] = 0;
-        TARGET_RESPBUF[i + 10] = 0;     /* Recovery time limit (1ms) */
-        TARGET_RESPBUF[i + 11] = 1;
-      }
-      /* Set data length */
-      if (target_cmdbuf[1] & 0x08) len = 16; else len = 24;
-      /* Truncate data if necessary */
-      if (target_cmdbuf[4] < len) {
-        len = target_cmdbuf[4];
-      }
-      break;
-    default:
-      /* Requested mode page not supported */
-      /* Prepare sense data */
-      target_status = STATUS_CHECK;
-      target_sense[target_lun].key = ILLEGAL_REQUEST;
-      target_sense[target_lun].code = INVALID_FIELD_IN_CDB;       /* "Invalid field in CDB" */
-      target_sense[target_lun].key_specific[0] = ERROR_IN_OPCODE;  /* "Error in Byte 2" */
-      target_sense[target_lun].key_specific[1] = 0x00;
-      target_sense[target_lun].key_specific[2] = 0x02;
-      return 0;
-  }
-
-  // Send it
-  return target_DIN(TARGET_RESPBUF, len, 1);
-}
-
 //  Start / Stop Unit Command
 int target_CommandStartStop() {
   DEBUGPRINT(DBG_TRACE, " > Start/Stop");
@@ -410,27 +282,6 @@ int target_CommandSendDiag() {
     return 0;
   }
   return 0;
-}
-
-// Get Unit Capacity
-int target_CommandCapacity() {
-  uint32_t cap = lun[target_lun].Size -1;
-  DEBUGPRINT(DBG_TRACE, " > Capacity");
-  if(target_CheckMedium()) return 0;
-
-  TARGET_RESPBUF[0] = (cap >> 24) & 0xff;
-  TARGET_RESPBUF[1] = (cap >> 16) & 0xff;
-  TARGET_RESPBUF[2] = (cap >> 8) & 0xff;
-  TARGET_RESPBUF[3] = cap & 0xff;
-
-  // 512byte sectors
-  TARGET_RESPBUF[4] = 0;
-  TARGET_RESPBUF[5] = 0;
-  TARGET_RESPBUF[6] = 2;
-  TARGET_RESPBUF[7] = 0;
-
-  // Send it
-  return target_DIN(TARGET_RESPBUF, 8, 1);
 }
 
 // Unknown command from Macs, disables Unit Attention known to be a problem on Macs
@@ -612,52 +463,36 @@ int target_ProcessCommand() {
   }
 #endif
 
-#ifdef SUPPORT_ETHERNET_CABLETRON
-  if(lun[target_lun].Type == LUN_ETHERNET_CABLETRON) {
-    int rv = target_CabletronProcess();
-    if(rv >= 0) return rv;
-    //goto unknownCommand;
-  }
-#endif
-
-#ifdef SUPPORT_ETHERNET_SCSILINK
-  if(lun[target_lun].Type == LUN_ETHERNET_SCSILINK) {
-    int rv = target_SCSILinkProcess();
-    if(rv >= 0) return rv;
-    //goto unknownCommand;
-  }
-#endif
-
-  if(lun[target_lun].Type == LUN_DISK_GENERIC) {
-    switch(target_cmdbuf[0]) {
-      case CMD_TEST_UNIT_READY:     return target_CommandTestReady();
-      case CMD_REZERO_UNIT:         return target_CommandReZero();
-      case CMD_FORMAT_UNIT:         return target_CommandFormat();
-      case CMD_READ6:               return target_CommandRead();
-      case CMD_WRITE6:              return target_CommandWrite();
-      case CMD_MODE_SENSE6:         return target_CommandModeSense6();
-      case CMD_START_STOP_UNIT:     return target_CommandStartStop();
-      case CMD_SEND_DIAGNOSTIC:     return target_CommandSendDiag();
-      case CMD_READ_CAPACITY10:     return target_CommandCapacity();
-      case CMD_READ10:              return target_CommandGroup1Read();
-      case CMD_WRITE10:             return target_CommandGroup1Write();
-      case CMD_WRITEANDVERIFY10:    return target_CommandGroup1Write();
-      case CMD_READLONG10:          return target_CommandGroup1ReadLong();
-      case CMD_WRITELONG10:         return target_CommandGroup1WriteLong();
-      case CMD_SYNCHRONIZE_CACHE10: return target_CommandGroup1SyncCache();
-      case CMD_VERIFY10:            return target_CommandGroup1Verify();
+  switch(lun[target_lun].Type) {
+    case LUN_DISK_GENERIC: {
+      int rv = target_DiskProcess();
+      if(rv >= 0) return rv;
+      break;
     }
-  }
-
 #ifdef SUPPORT_OPTICAL
-  if(lun[target_lun].Type == LUN_OPTICAL_GENERIC) {
-    switch(target_cmdbuf[0]) {
-      case CMD_READUPDATEDBLOCK10:  return target_CommandReadUpdatedBlock();
+    case LUN_OPTICAL_GENERIC: {
+      int rv = target_OpticalProcess();
+      if(rv >= 0) return rv;
+      break;
     }
-  }
 #endif
+#ifdef SUPPORT_ETHERNET_CABLETRON
+    case LUN_ETHERNET_CABLETRON: {
+      int rv = target_CabletronProcess();
+      if(rv >= 0) return rv;
+      break;
+    }
+#endif
+#ifdef SUPPORT_ETHERNET_SCSILINK
+    case LUN_ETHERNET_SCSILINK: {
+      int rv = target_SCSILinkProcess();
+      if(rv >= 0) return rv;
+      break;
+    }
+#endif
+  }
 
-unknownCommand:
+//unknownCommand:
   DEBUGPRINT(DBG_GENERAL, " >Unknown Command");
   print_cdb();
   target_status = STATUS_CHECK;

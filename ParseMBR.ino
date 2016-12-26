@@ -50,7 +50,7 @@ void ParseMBR(int Table) {
         // Find first unused disk LUN
         for(tLUN = 0; tLUN < MAXLUNS; tLUN++) {
            if (!lun[tLUN].Enabled) continue;
-           if (lun[tLUN].Type != LUN_DISK_GENERIC) continue;
+           if (lun[tLUN].Type != 0) continue;
            if (lun[tLUN].Size != 0) continue;
            break;
         }
@@ -58,6 +58,10 @@ void ParseMBR(int Table) {
           lun[tLUN].Type = LUN_DISK_GENERIC;
           lun[tLUN].Offset = pTable[Table].Offset + pOffset;
           lun[tLUN].Size = pSize;
+          lun[tLUN].Sectors = 16;
+          lun[tLUN].SectorSize = 512;
+          lun[tLUN].Heads = 16;
+          lun[tLUN].Cylinders = pSize / (lun[tLUN].Heads * lun[tLUN].Sectors);
           lun[tLUN].Mounted = 1;
           luns++;
         }
@@ -65,7 +69,7 @@ void ParseMBR(int Table) {
       case 0xf9: // Optical LUN
         for(tLUN = 0; tLUN < MAXLUNS; tLUN++) {
            if (!lun[tLUN].Enabled) continue;
-           if (lun[tLUN].Type != LUN_OPTICAL_GENERIC) continue;
+           if (lun[tLUN].Type != 0) continue;
            if (lun[tLUN].Size != 0) continue;
            break;
         }
@@ -77,7 +81,37 @@ void ParseMBR(int Table) {
           luns++;
         }
 #endif
-      default:
+#ifdef SUPPORT_ETHERNET_CABLETRON
+      case 0xfa: // Ethernet Cabletron
+        for(tLUN = 0; tLUN < MAXLUNS; tLUN++) {
+           if (!lun[tLUN].Enabled) continue;
+           if (lun[tLUN].Type != 0) continue;
+           if (lun[tLUN].Size != 0) continue;
+           break;
+        }
+        if(tLUN < MAXLUNS) {
+          lun[tLUN].Type = LUN_ETHERNET_CABLETRON;
+          lun[tLUN].Offset = pTable[Table].Offset + pOffset;
+          lun[tLUN].Size = pSize;
+          luns++;
+        }
+#endif
+#ifdef SUPPORT_ETHERNET_SCSILINK
+      case 0xfb: // Ethernet SCSILink
+        for(tLUN = 0; tLUN < MAXLUNS; tLUN++) {
+           if (!lun[tLUN].Enabled) continue;
+           if (lun[tLUN].Type != 0) continue;
+           if (lun[tLUN].Size != 0) continue;
+           break;
+        }
+        if(tLUN < MAXLUNS) {
+          lun[tLUN].Type = LUN_ETHERNET_SCSILINK;
+          lun[tLUN].Offset = pTable[Table].Offset + pOffset;
+          lun[tLUN].Size = pSize;
+          luns++;
+        }
+#endif
+default:
         pTable[Table].Part[part].Offset = pTable[Table].Offset + pOffset;
     }
   }

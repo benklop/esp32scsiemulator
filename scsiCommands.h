@@ -2,9 +2,13 @@
 #define SCSI_COMMANDS_H
 
 /* Mode pages */
-#define VENDOR_SPECIFIC    0x00
-#define RW_ERROR_RECOVERY  0x01
-#define ALL_PAGES          0x3F
+#define MODEPAGE_VENDOR_SPECIFIC    0x00
+#define MODEPAGE_RW_ERROR_RECOVERY  0x01
+#define MODEPAGE_DCRC_PARAMETERS    0x02
+#define MODEPAGE_FORMAT_PARAMETERS  0x03
+#define MODEPAGE_RIGID_GEOMETRY     0x04
+#define MODEPAGE_APPLE              0x30
+#define MODEPAGE_ALL_PAGES          0x3F
 
 /* 6 Byte command opcodes */
 #define CMD_TEST_UNIT_READY       0x00
